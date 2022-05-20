@@ -37,15 +37,17 @@ local cheat_client = {
             },
         },
         exploits = {
-            force_respawn = true,
+            force_respawn = false,
 
             spoof_snowshoes = true,
+
+            always_full_speed = false,
 
             infinite_stamina = true,
             infinite_warmth = true,
             infinite_hunger = true,
 
-            no_down = true,
+            no_down = false,
 
             instant_interaction = true,
         },
@@ -66,7 +68,7 @@ local garbage_collection = getgc(true)
 local game_client = {}
 for _, v in pairs(garbage_collection) do
     if typeof(v) == "table" then
-        if rawget(v, "humanoid") then -- Init Chunk (IDK why but game no longer uses this, so it will never appear)
+        if rawget(v, "randomStringsReceive") then -- Init Chunk (IDK why but game no longer uses this, so it will never appear)
             game_client.setup = v
         elseif rawget(v, "fillHunger") then -- Character Chunk
             game_client.integrity = v
@@ -92,8 +94,9 @@ for _, v in pairs(garbage_collection) do
     end
 end
 
--- Functions
+print(game_client.setup)
 
+-- Functions
 do -- Utility
     function cheat_client:handle_drawing(type, properties)
         local drawing = Drawing.new(type)
@@ -169,7 +172,8 @@ do --Exploits
     end
 end
 
-do -- Hooks
+-- Hooks
+do 
     do -- integrity hooks
         local old_set_warmth = game_client.integrity.setWarmth
         local old_set_stamina = game_client.integrity.setStamina
@@ -220,15 +224,24 @@ do -- Hooks
 
     do -- stance hooks
         local old_update_walkspeed = game_client.stance.updateWalkSpeed
+
+        game_client.stance.updateWalkSpeed = function(self)
+            if cheat_client.config.exploits.always_full_speed then
+                game_client.setup.humanoid.Walkspeed = 13
+                game_client.setup.humanoid.JumpPower = 50
+            else
+                old_update_walkspeed(self)
+            end
+        end
         -- For future exploiting
 
         local old_set_down = game_client.stance.down
 
-        game_client.stance.down = function()
+        game_client.stance.down = function(self)
             if cheat_client.config.exploits.no_down then
                 return
             else
-                return old_set_down()
+                old_set_down(self)
             end
         end
     end
@@ -265,7 +278,8 @@ do -- Hooks
     end
 end
 
-do -- Init
+ -- Init
+do
     game_client.interface:newHint(("Welcome %s, to Yukihook."):format(local_player.Name))
 
     fov_circle = cheat_client:handle_drawing("Circle", {

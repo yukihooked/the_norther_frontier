@@ -39,6 +39,8 @@ local cheat_client = {
         exploits = {
             force_respawn = true,
 
+            spoof_snowshoes = true,
+
             infinite_stamina = true,
             infinite_warmth = true,
             infinite_hunger = true,
@@ -229,6 +231,19 @@ do -- Hooks
                 return old_set_down()
             end
         end
+    end
+
+    do -- inventory hooks
+        local old_get_equipped_type_item = game_client.inventory.getEquippedTypeItem
+
+        game_client.inventory.getEquippedTypeItem = function(self, key)
+            if cheat_client.config.exploits.spoof_snowshoes and key == "snowshoes" then
+                return true    
+            else
+                return old_get_equipped_type_item(self, key)
+            end
+        end
+        
     end
 
     do -- weapon hook

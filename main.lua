@@ -9,14 +9,52 @@ local local_player = Players.LocalPlayer
 
 local mouse = local_player:GetMouse()
 
--- Drawings
+-- Drawings 
 local fov_circle
 local fov_target
 
 -- Status
-local aim_distance = 500
-local ignore_fov = true
-local current_target = nil
+local cheat_client = {
+    config = {
+        aim = {
+            enabled = true,
+            fov = 100,
+            max_distance = 500,
+            ignore_fov = true,
+            silent = true,
+            non_sticky = true,
+            aim_key = Enum.KeyCode.LeftControl
+        },
+        esp = {
+            player = {
+                enabled = true,
+            },
+            entity = {
+                ore = true,
+                npc = true,
+                animal = true,
+                dropped = true,
+            },
+        },
+        exploits = {
+            force_respawn = true,
+
+            infinite_stamina = true,
+            infinite_warmth = true,
+            infinite_hunger = true,
+
+            instant_interaction = true,
+        },
+    },
+
+    status = {
+        current_target = nil,
+    },
+
+    hooks = {},
+    connections = {},
+    drawings = {},
+}
 
 -- Garbage Collector
 local garbage_collection = getgc(true)
@@ -51,57 +89,78 @@ for _, v in pairs(garbage_collection) do
 end
 
 -- Functions
-local function handle_drawing(type, properties)
-    local drawing = Drawing.new(type)
-    for i,v in next, properties do
-        drawing[i] = v
+
+do -- Utility
+    function cheat_client:handle_drawing(type, properties)
+        local drawing = Drawing.new(type)
+        for i,v in next, properties do
+            drawing[i] = v
+        end
+        return drawing
     end
-    return drawing
+    
+    function cheat_client:get_character(player)
+        return Workspace.World.Characters:FindFirstChild(player)
+    end
+    
+    function cheat_client:get_camera(player)
+        return Workspace.CurrentCamera
+    end
+
+    function cheat_client:unload()
+        
+    end
 end
 
-local function get_character(player)
-    return Workspace.World.Characters:FindFirstChild(player)
-end
-
-local function get_camera(player)
-    return Workspace.CurrentCamera
-end
-
-local function calculate_target()
-    if local_player.Character then
-        local max_distance = math.huge
-        local target 
-        local magnitude
-        local current_character
-        for _,v in next, Players:GetPlayers() do
-            if v ~= local_player then
-                current_character = get_character(v.Name)
-                if current_character then
-                    if current_character:FindFirstChild("Torso") then
-                        if local_player:DistanceFromCharacter(current_character.Torso.Position) < aim_distance then
-                            local camera = get_camera()
-                            local screen_position, on_screen = camera:WorldToViewportPoint(current_character.Torso.Position)
-                            if on_screen then
-                                magnitude = (fov_circle.Position - Vector2.new(screen_position.X, screen_position.Y)).magnitude
-                                if (magnitude < fov_circle.Radius) or ignore_fov then
-                                    if magnitude < max_distance then
-                                        max_distance = magnitude
-                                        target = current_character
+do -- Aim
+    function cheat_client:calculate_target()
+        if local_player.Character then
+            local max_distance = math.huge
+            local target 
+            local magnitude
+            local current_character
+            for _,v in next, Players:GetPlayers() do
+                if v ~= local_player then
+                    current_character = cheat_client:get_character(v.Name)
+                    if current_character then
+                        if current_character:FindFirstChild("Torso") then
+                            if local_player:DistanceFromCharacter(current_character.Torso.Position) < cheat_client.config.aim.max_distance then
+                                local camera = cheat_client:get_camera()
+                                local screen_position, on_screen = camera:WorldToViewportPoint(current_character.Torso.Position)
+                                if on_screen then
+                                    magnitude = (fov_circle.Position - Vector2.new(screen_position.X, screen_position.Y)).magnitude
+                                    if (magnitude < fov_circle.Radius) or cheat_client.config.aim.ignore_fov then
+                                        if magnitude < max_distance then
+                                            max_distance = magnitude
+                                            target = current_character
+                                        end
                                     end
+                                    current_character = nil
+                                else
+                                    current_character = nil
                                 end
-                                current_character = nil
-                            else
-                                current_character = nil
                             end
                         end
                     end
                 end
             end
+            if UserInputService:IsKeyDown("LeftControl") then
+                cheat_client.status.current_target = target
+            else
+                cheat_client.status.current_target = nil
+            end
         end
-        if UserInputService:IsKeyDown("LeftControl") then
-            current_target = target
-        else
-            current_target = nil
+    end
+end
+
+do -- ESP
+    
+end
+
+do --Exploits
+    function cheat_client:force_respawn()
+        if game_client.stance and cheat_client.config.exploits.force_respawn then
+            game_client.stance:respawn()
         end
     end
 end
@@ -113,18 +172,30 @@ do -- Hooks
         local old_set_hunger = game_client.integrity.setHunger
 
         game_client.integrity.setWarmth = function(self, warmth)
-            warmth = 6000 -- This get's clamped anyways
-            return old_set_warmth(game_client.integrity, warmth)
+            if cheat_client.config.exploits.infinite_warmth then
+                warmth = 6000 -- This get's clamped anyways
+                return old_set_warmth(game_client.integrity, warmth)
+            else
+                return old_set_warmth(game_client.integrity, warmth)
+            end
         end
 
         game_client.integrity.setStamina = function(self, stamina)
-            stamina = 100 -- This get's clamped anyways
-            return old_set_stamina(game_client.integrity, stamina)
+            if cheat_client.config.exploits.infinite_stamina then
+                stamina = 100 -- This get's clamped anyways
+                return old_set_stamina(game_client.integrity, stamina)
+            else
+                return old_set_stamina(game_client.integrity, stamina)
+            end
         end
 
         game_client.integrity.setHunger = function(self, hunger)
-            hunger = 200 -- This get's clamped anyways
-            return old_set_hunger(game_client.integrity, hunger)
+            if cheat_client.config.exploits.infinite_stamina then
+                hunger = 200 -- This get's clamped anyways
+                return old_set_hunger(game_client.integrity, hunger)
+            else
+                return old_set_hunger(game_client.integrity, hunger)
+            end
         end
     end
 
@@ -132,9 +203,13 @@ do -- Hooks
         local old_start_interaction = game_client.interaction._start
 
         game_client.interaction._start = function(object)
-            if object.objectTargetting or object.deployValid then
-                object.interacting = true
-                object:request()
+            if cheat_client.config.exploits.instant_interaction then
+                if object.objectTargetting or object.deployValid then
+                    object.interacting = true
+                    object:request()
+                end
+            else
+                return old_start_interaction(object)
             end
         end
     end
@@ -149,8 +224,8 @@ do -- Hooks
         index_hook = hookmetamethod(game, "__index", function(self, index)
             if not checkcaller() then
                 if self == mouse and index == "Hit" then
-                    if current_target then
-                        return current_target.Torso.CFrame
+                    if cheat_client.status.current_target then
+                        return cheat_client.status.current_target.Torso.CFrame
                     end
                 end
             end
@@ -166,7 +241,7 @@ end
 do -- Init
     game_client.interface:newHint(("Welcome %s, to Yukihook."):format(local_player.Name))
 
-    fov_circle = handle_drawing("Circle", {
+    fov_circle = cheat_client:handle_drawing("Circle", {
         Radius = 100,
         Transparency = 1,
         Filled = false,
@@ -175,7 +250,7 @@ do -- Init
         Color = Color3.fromRGB(255,255,255),
     })
 
-    fov_target = handle_drawing("Circle", {
+    fov_target = cheat_client:handle_drawing("Circle", {
         Radius = 4,
         Transparency = 1,
         Thickness = 1,
@@ -186,18 +261,25 @@ end
 
 -- Connections
 RunService.RenderStepped:Connect(function()
-    calculate_target()
+    cheat_client:calculate_target()
     fov_circle.Position = UserInputService:GetMouseLocation()
-    fov_circle.Color = current_target and Color3.fromRGB(255,0,0) or Color3.fromRGB(255, 255, 255)
-    fov_circle.Visible = not ignore_fov and true or false
-    if current_target then
-        local camera = get_camera()
-        local screen_position, on_screen = camera:WorldToViewportPoint(current_target.Torso.Position)
+    fov_circle.Color = cheat_client.status.current_target and Color3.fromRGB(255,0,0) or Color3.fromRGB(255, 255, 255)
+    fov_circle.Visible = not cheat_client.config.aim.ignore_fov and true or false
+    if cheat_client.status.current_target then
+        local camera = cheat_client:get_camera()
+        local screen_position, on_screen = camera:WorldToViewportPoint(cheat_client.status.current_target.Torso.Position)
         if on_screen then
             fov_target.Position = Vector2.new(screen_position.X, screen_position.Y)
             fov_target.Visible = true
         end
     else
         fov_target.Visible = false
+    end
+end)
+
+UserInputService.InputBegan:Connect(function(input, processed)
+    -- Force Respawn lol
+    if input.KeyCode == Enum.KeyCode.F8 then
+        cheat_client:force_respawn()
     end
 end)

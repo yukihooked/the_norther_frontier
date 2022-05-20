@@ -145,22 +145,6 @@ do -- Hooks
     end
 
     do -- weapon hook
-        local old_start_reload = game_client.item.reloadStart
-
-        game_client.item.reloadStart = function(item)
-        	if item.drawn and item.content.ammoLoaded == 0 and not item.reloading and game_client.inventory:getBackpackNameItem(item.stats.weapon.ammoType) then
-                local reload_amount = math.min(1, game_client.inventory:getBackpackAmountNameItem(item.stats.weapon.ammoType)) -- The minumum amount is always 1 lol idk why the game has faulty code
-                if reload_amount > 0 then
-                    for i = 1, reload_amount do
-                        game_client.inventory:removeItem(game_client.inventory:getBackpackNameItem(item.stats.weapon.ammoType))
-                    end
-                end
-                item.content.ammoLoaded = reload_amount
-                item.content._token = reload_amount
-            end
-        end
-
-
         local index_hook
         index_hook = hookmetamethod(game, "__index", function(self, index)
             if not checkcaller() then

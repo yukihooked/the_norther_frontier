@@ -242,7 +242,7 @@ do -- Init
     game_client.interface:newHint(("Welcome %s, to Yukihook."):format(local_player.Name))
 
     fov_circle = cheat_client:handle_drawing("Circle", {
-        Radius = 100,
+        Radius = cheat_client.config.aim.fov,
         Transparency = 1,
         Filled = false,
         Thickness = 1,

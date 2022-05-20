@@ -43,6 +43,8 @@ local cheat_client = {
             infinite_warmth = true,
             infinite_hunger = true,
 
+            no_down = true,
+
             instant_interaction = true,
         },
     },
@@ -217,6 +219,16 @@ do -- Hooks
     do -- stance hooks
         local old_update_walkspeed = game_client.stance.updateWalkSpeed
         -- For future exploiting
+
+        local old_set_down = game_client.stance.down
+
+        game_client.stance.down = function()
+            if cheat_client.config.exploits.no_down then
+                return
+            else
+                return old_set_down()
+            end
+        end
     end
 
     do -- weapon hook

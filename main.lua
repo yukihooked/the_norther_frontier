@@ -77,20 +77,22 @@ local function calculate_target()
             if v ~= local_player then
                 current_character = get_character(v.Name)
                 if current_character then
-                    if local_player:DistanceFromCharacter(current_character.Torso.Position) < aim_distance then
-                        local camera = get_camera()
-                        local screen_position, on_screen = camera:WorldToViewportPoint(current_character.Torso.Position)
-                        if on_screen then
-                            magnitude = (fov_circle.Position - Vector2.new(screen_position.X, screen_position.Y)).magnitude
-                            if (magnitude < fov_circle.Radius) or ignore_fov then
-                                if magnitude < max_distance then
-                                    max_distance = magnitude
-                                    target = current_character
+                    if current_character:FindFirstChild("Torso") then
+                        if local_player:DistanceFromCharacter(current_character.Torso.Position) < aim_distance then
+                            local camera = get_camera()
+                            local screen_position, on_screen = camera:WorldToViewportPoint(current_character.Torso.Position)
+                            if on_screen then
+                                magnitude = (fov_circle.Position - Vector2.new(screen_position.X, screen_position.Y)).magnitude
+                                if (magnitude < fov_circle.Radius) or ignore_fov then
+                                    if magnitude < max_distance then
+                                        max_distance = magnitude
+                                        target = current_character
+                                    end
                                 end
+                                current_character = nil
+                            else
+                                current_character = nil
                             end
-                            current_character = nil
-                        else
-                            current_character = nil
                         end
                     end
                 end
@@ -143,6 +145,22 @@ do -- Hooks
     end
 
     do -- weapon hook
+        local old_start_reload = game_client.item.reloadStart
+
+        game_client.item.reloadStart = function(item)
+        	if item.drawn and item.content.ammoLoaded == 0 and not item.reloading and game_client.inventory:getBackpackNameItem(item.stats.weapon.ammoType) then
+                local reload_amount = math.min(1, game_client.inventory:getBackpackAmountNameItem(item.stats.weapon.ammoType)) -- The minumum amount is always 1 lol idk why the game has faulty code
+                if reload_amount > 0 then
+                    for i = 1, reload_amount do
+                        game_client.inventory:removeItem(game_client.inventory:getBackpackNameItem(item.stats.weapon.ammoType))
+                    end
+                end
+                item.content.ammoLoaded = reload_amount
+                item.content._token = reload_amount
+            end
+        end
+
+
         local index_hook
         index_hook = hookmetamethod(game, "__index", function(self, index)
             if not checkcaller() then
@@ -154,6 +172,8 @@ do -- Hooks
             end
             return index_hook(self, index)
         end)
+
+        
 
         -- Insert Instant Reload, it's not that hard
     end

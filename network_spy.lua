@@ -33,7 +33,7 @@ end
 for i,v in next, getloadedmodules() do -- You can't grab misc directly from functions, so I just did this
     if v.Name == "Misc" then
         game_client.misc = require(v)
-        break
+        break -- There's 2 Misc modules for no reason
     end
 end
 

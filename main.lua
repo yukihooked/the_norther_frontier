@@ -677,9 +677,6 @@ do
             end
         end)
     end
-
-    w
-
     
     cheat_client:handle_connection(UserInputService.InputBegan, function(input, processed)
         -- Force Respawn lol

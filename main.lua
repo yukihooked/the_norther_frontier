@@ -41,7 +41,8 @@ local cheat_client = {
 
             spoof_snowshoes = true,
 
-            always_full_speed = false,
+            hook_walkspeed = true,
+            walkspeed = 13,
 
             infinite_stamina = true,
             infinite_warmth = true,
@@ -226,8 +227,8 @@ do
         local old_update_walkspeed = game_client.stance.updateWalkSpeed
 
         game_client.stance.updateWalkSpeed = function(self)
-            if cheat_client.config.exploits.always_full_speed then
-                game_client.setup.humanoid.Walkspeed = 13
+            if cheat_client.config.exploits.hook_walkspeed then
+                game_client.setup.humanoid.WalkSpeed = cheat_client.config.exploits.walkspeed
                 game_client.setup.humanoid.JumpPower = 50
             else
                 old_update_walkspeed(self)

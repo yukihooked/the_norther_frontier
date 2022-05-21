@@ -1,5 +1,6 @@
 -- Services
-local UserInputService = game:GetService("UserInputService") 
+local UserInputService = game:GetService("UserInputService")
+local StarterGui = game:GetService("StarterGui")
 local RunService = game:GetService("RunService") 
 local Workspace = game:GetService("Workspace")
 local Players = game:GetService("Players")
@@ -36,13 +37,16 @@ local cheat_client = {
                 dropped = true,
             },
         },
+        misc = {
+            mod_notification = true,
+        },
         exploits = {
             force_respawn = false,
 
             spoof_snowshoes = true,
 
-            hook_walkspeed = true,
-            walkspeed = 13,
+            hook_walkspeed = false,
+            walkspeed = 30,
 
             infinite_stamina = true,
             infinite_warmth = true,
@@ -95,8 +99,6 @@ for _, v in pairs(garbage_collection) do
     end
 end
 
-print(game_client.setup)
-
 -- Functions
 do -- Utility
     function cheat_client:handle_drawing(type, properties)
@@ -117,6 +119,14 @@ do -- Utility
 
     function cheat_client:unload()
         
+    end
+
+    function cheat_client:handle_object(type, properties)
+        local object = Instance.new(type)
+        for i,v in next, properties do
+            object[i] = v
+        end
+        return object
     end
 end
 
@@ -162,7 +172,35 @@ do -- Aim
 end
 
 do -- ESP
-    
+end
+
+do -- Misc
+    function cheat_client:detect_mod(player)
+        if player:GetRankInGroup(10800343) > 1 then
+            local player_icon = Players:GetUserThumbnailAsync(player.UserId, Enum.ThumbnailType.HeadShot, Enum.ThumbnailSize.Size48x48)
+            local player_rank = player:GetRoleInGroup(10800343)
+
+            local notification_bind = self:handle_object("BindableFunction", {
+                OnInvoke = function(value)
+                    if value == "Log" then
+                        local_player:Kick("Moderator detected, client initiated disconnect")
+                    end
+                end
+            })
+
+            StarterGui:SetCore("SendNotification", {
+                Title = "Moderator Detected",
+                Text = ("Detected %s, Role: %s"):format(player.Name, player_rank),
+                Icon = player_icon,
+                Duration = 60,
+                Button1 = "Log",
+                Button2 = "Dismiss",
+                Callback = notification_bind
+            })
+
+            notification_bind:Destroy()
+        end
+    end
 end
 
 do --Exploits
@@ -279,8 +317,16 @@ do
     end
 end
 
- -- Init
+-- Init
 do
+    if cheat_client.config.misc.mod_notification then
+        for _,v in next, Players:GetPlayers() do
+            task.spawn(function()
+               cheat_client:detect_mod(v)
+            end)
+        end
+    end
+
     game_client.interface:newHint(("Welcome %s, to Yukihook."):format(local_player.Name))
 
     fov_circle = cheat_client:handle_drawing("Circle", {
@@ -323,5 +369,11 @@ UserInputService.InputBegan:Connect(function(input, processed)
     -- Force Respawn lol
     if input.KeyCode == Enum.KeyCode.F8 then
         cheat_client:force_respawn()
+    end
+end)
+
+Players.PlayerAdded:Connect(function(player)
+    if cheat_client.config.misc.mod_notification then
+        cheat_client:detect_mod(player)
     end
 end)

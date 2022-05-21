@@ -41,20 +41,24 @@ local cheat_client = {
             mod_notification = true,
         },
         exploits = {
-            force_respawn = false,
-
-            spoof_snowshoes = true,
-
-            hook_walkspeed = false,
-            walkspeed = 30,
-
             infinite_stamina = true,
             infinite_warmth = true,
             infinite_hunger = true,
 
+            force_respawn = true,
             no_down = false,
+            spoof_snowshoes = true,
+            hook_walkspeed = false,
+            walkspeed = 30,
 
             instant_interaction = true,
+
+            gun_exploits = {
+                enabled = true,
+                no_spread = true,
+                modify_range = true,
+                max_range = 500, -- This is probably your max fire distance, increase at your own risk
+            },
         },
     },
 
@@ -72,7 +76,7 @@ local garbage_collection = getgc(true)
 
 local game_client = {}
 for _, v in pairs(garbage_collection) do
-    if typeof(v) == "table" then
+    if typeof(v) == "table" then    
         if rawget(v, "randomStringsReceive") then -- Init Chunk (IDK why but game no longer uses this, so it will never appear)
             game_client.setup = v
         elseif rawget(v, "fillHunger") then -- Character Chunk
@@ -91,11 +95,18 @@ for _, v in pairs(garbage_collection) do
             game_client.economy = v
         elseif rawget(v, "newHint") then -- UI Chunk
             game_client.interface = v
-        elseif rawget(v, "Request") then -- Network Chunk
-            game_client.misc = v
-        elseif rawget(v, "animateProjectile") then
+        elseif rawget(v, "animateProjectile") then -- Weapon Chunk
             game_client.weapon_fire = v
+        elseif rawget(v, "addLootItem") then -- Player Chunk
+            game_client.other_player = v
         end
+    end
+end
+
+for i,v in next, getloadedmodules() do
+    if v.Name == "Misc" then
+        game_client.misc = require(v)
+        break
     end
 end
 
@@ -190,9 +201,9 @@ do -- Misc
 
             StarterGui:SetCore("SendNotification", {
                 Title = "Moderator Detected",
-                Text = ("Detected %s, Role: %s"):format(player.Name, player_rank),
+                Text = ("Name: %s\nRole: %s"):format(player.Name, player_rank),
                 Icon = player_icon,
-                Duration = 60,
+                Duration = 300, -- 5 minutes
                 Button1 = "Log",
                 Button2 = "Dismiss",
                 Callback = notification_bind
@@ -299,6 +310,23 @@ do
     end
 
     do -- weapon hook
+        local old_ray = game_client.weapon_fire.ray
+
+        game_client.weapon_fire.ray = function(self, weapon)
+            if cheat_client.config.exploits.gun_exploits.enabled then
+                local weapon_clone = weapon
+                if cheat_client.config.exploits.gun_exploits.no_spread then
+                    weapon_clone.stats.weapon.spread = 0
+                end
+                if cheat_client.config.exploits.gun_exploits.modify_range then
+                    weapon_clone.stats.weapon.maxRange = cheat_client.config.exploits.gun_exploits.max_range
+                end
+                return old_ray(self, weapon_clone)
+            else
+                return old_ray(self, weapon)
+            end
+        end
+
         local index_hook
         index_hook = hookmetamethod(game, "__index", function(self, index)
             if not checkcaller() then
@@ -319,15 +347,16 @@ end
 
 -- Init
 do
+    
+    game_client.interface:newHint(("Welcome %s, to Yukihook."):format(local_player.Name))
+
     if cheat_client.config.misc.mod_notification then
         for _,v in next, Players:GetPlayers() do
-            task.spawn(function()
+            task.spawn(function() -- I need a new thread cause this uses web stuff
                cheat_client:detect_mod(v)
             end)
         end
     end
-
-    game_client.interface:newHint(("Welcome %s, to Yukihook."):format(local_player.Name))
 
     fov_circle = cheat_client:handle_drawing("Circle", {
         Radius = cheat_client.config.aim.fov,
@@ -374,6 +403,8 @@ end)
 
 Players.PlayerAdded:Connect(function(player)
     if cheat_client.config.misc.mod_notification then
-        cheat_client:detect_mod(player)
+        task.spawn(function() -- I need a new thread cause this uses web stuff
+            cheat_client:detect_mod(player)
+        end)
     end
 end)

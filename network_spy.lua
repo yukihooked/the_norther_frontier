@@ -63,5 +63,5 @@ game_client.misc.Request = function(command, ...)
         rconsoleprint(command.."\t"..print_table(arguments))
     end
 
-    old_request(command, ...)
+    return old_request(command, ...)
 end

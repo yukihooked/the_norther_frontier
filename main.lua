@@ -51,18 +51,22 @@ local cheat_client = {
             auto_log = false,
         },
         exploits = {
-            infinite_stamina = true,
+            infinite_stamina = true, -- Integrity
             infinite_warmth = true,
             infinite_hunger = true,
 
-            force_respawn = true, -- F8
-            force_rejoin = true, -- End
+            force_respawn = true, -- Stance
             no_down = false,
             spoof_snowshoes = true,
             hook_walkspeed = false,
             walkspeed = 30,
 
-            instant_interaction = true,
+            instant_interaction = true, -- Interaction
+
+            spoof_maxeight = true, -- Inventory
+            max_weight = 1000,
+
+            force_rejoin = true, -- Teleport
 
             gun_exploits = {
                 enabled = true,
@@ -261,8 +265,8 @@ do
         function cheat_client:add_ore_esp(ore)
             local esp = {
                 object = ore,
-                ore_status = ore:FindFirstChild("Status"),
-                ore_type = ore:FindFirstChild("Status"):FindFirstChild("OreType").Value,
+                ore_status = ore:WaitForChild("Status"),
+                ore_type = ore:WaitForChild("Status"):WaitForChild("OreType").Value,
                 drawings = {},
             }
 
@@ -318,7 +322,7 @@ do
         function cheat_client:add_animal_esp(animal)
             local esp = {
                 object = animal,
-                animal_status = animal:FindFirstChild("Status"),
+                animal_status = animal:WaitForChild("Status"),
                 animal_type = string.lower(animal.Name),
                 drawings = {},
             }
@@ -552,12 +556,22 @@ do
 
     do -- inventory hooks
         local old_get_equipped_type_item = game_client.inventory.getEquippedTypeItem
+        local old_update_weight = game_client.inventory.updateWeight
 
         game_client.inventory.getEquippedTypeItem = function(self, key)
             if cheat_client.config.exploits.spoof_snowshoes and key == "snowshoes" then
                 return true    
             else
                 return old_get_equipped_type_item(self, key)
+            end
+        end
+
+        game_client.inventory.updateWeight = function(self) -- I actually don't know what p13 is lol
+            if cheat_client.config.exploits.spoof_maxeight then
+                self.maxWeight = cheat_client.config.exploits.max_weight
+                old_update_weight(self)
+            else
+                old_update_weight(self)
             end
         end
         
@@ -676,7 +690,7 @@ do
                 fov_target.Visible = false
             end
         end)
-    end
+    end 
     
     cheat_client:handle_connection(UserInputService.InputBegan, function(input, processed)
         -- Force Respawn lol

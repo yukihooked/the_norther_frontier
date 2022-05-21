@@ -22,7 +22,7 @@ game_client.misc.Request = function(command, ...)
             local d = ("\t"):rep(depth)
             local str = ""
             for i,v in next, tbl do
-                str = str .. d .. tostring(i) .. '\t' .. tostring(v)..'\n'
+                str = str .. d .. tostring(i) .. '\t' .. typeof(v)..": "..tostring(v)..'\n'
             end
             return str
         end

@@ -157,7 +157,7 @@ do
                 game_client.operable = v
             elseif rawget(v, "getBackpackNameItem") then
                 game_client.inventory = v
-            elseif rawget(v, "_request") then
+            elseif rawget(v, "deployItemStart") then
                 game_client.interaction = v
             elseif rawget(v, "eat") then
                 game_client.item = v

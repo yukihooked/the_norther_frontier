@@ -8,7 +8,6 @@ local Players = game:GetService("Players")
 
 -- Local
 local local_player = Players.LocalPlayer
-
 local mouse = local_player:GetMouse()
 
 -- Drawings 
@@ -65,6 +64,10 @@ local cheat_client = {
 
             spoof_maxeight = true, -- Inventory
             max_weight = 1000,
+            bypass_inventory_check = true,
+            auto_pickup = true,
+            auto_pickup_distance = 8, -- It's distance limited on server
+            auto_picked_list = {}, -- Prevent spam
 
             force_rejoin = true, -- Teleport
 
@@ -100,6 +103,7 @@ local cheat_client = {
 
     status = {
         current_target = nil,
+        block_save_progress = false,
     },
 
     hooks = {},
@@ -517,15 +521,29 @@ do
 
     do -- interaction hooks
         local old_start_interaction = game_client.interaction._start
+        local old_interaction_request = game_client.interaction.request
 
-        game_client.interaction._start = function(object)
+        game_client.interaction._start = function(self)
             if cheat_client.config.exploits.instant_interaction then
-                if object.objectTargetting or object.deployValid then
-                    object.interacting = true
-                    object:request()
+                if self.objectTargetting or self.deployValid then
+                    self.interacting = true
+                    self:request()
                 end
             else
-                return old_start_interaction(object)
+                return old_start_interaction(self)
+            end
+        end
+
+        game_client.interaction.request = function(self)
+            if cheat_client.config.exploits.bypass_inventory_check then
+                if self.interactionType == "takeItem" then
+                    game_client.interface:newHint("You take the " .. self.objectTargetting.name)
+                    self.objectTargetting:take()
+                else
+                    return old_interaction_request(self)
+                end
+            else
+                return old_interaction_request(self)
             end
         end
     end
@@ -574,6 +592,8 @@ do
                 old_update_weight(self)
             end
         end
+
+        
         
     end
 
@@ -610,6 +630,23 @@ do
         
 
         -- Insert Instant Reload, it's not that hard
+    end
+
+    do -- network hook
+        local old_request = game_client.misc.Request
+
+        game_client.misc.Request = function(command, ...)
+            local arguments = {...}
+            if command == "saveProgress" then
+                if cheat_client.status.block_save_progress then
+                    return
+                else
+                    return old_request(command, ...)
+                end
+            else
+                return old_request(command, ...)
+            end
+        end
     end
 end
 
@@ -700,6 +737,15 @@ do
             cheat_client.esp.global = not cheat_client.esp.global
         elseif input.KeyCode == Enum.KeyCode.End then
             cheat_client:force_rejoin()
+        elseif input.KeyCode == Enum.KeyCode.F5 then
+            local next_value = not cheat_client.status.block_save_progress
+            if next_value then
+                rconsoleprint("Active")
+                game_client.misc.Request("saveProgress", math.random(1, 5000) * 2 - 1)
+            else
+                rconsoleprint("Inactive")  
+            end
+            cheat_client.status.block_save_progress = next_value
         end
     end)
 
@@ -724,6 +770,30 @@ do
 
         cheat_client:handle_connection(Workspace.World.Items.ChildAdded, function(child)
             cheat_client:add_dropped_esp(child)
+        end)
+    end
+
+    do -- Autopickup Connection
+        cheat_client:handle_connection(RunService.RenderStepped, function()
+            if cheat_client.config.exploits.auto_pickup then
+                for _,v in next, Workspace.World.Items:GetChildren() do
+                    if cheat_client.config.exploits.auto_picked_list[v] then
+                        continue
+                    end
+                    if local_player.Character then
+                        if local_player:DistanceFromCharacter(v:GetBoundingBox().Position) <= cheat_client.config.exploits.auto_pickup_distance then
+                            local object_targetting = game_client.interaction:get(v)
+
+                            cheat_client.config.exploits.auto_picked_list[v] = true
+                            game_client.interaction.interactionType = "takeItem"
+                            game_client.interaction.objectTargetting = object_targetting
+                            game_client.interaction.parameter = nil
+                            game_client.interaction.interacting = true
+                            game_client.interaction:request()
+                        end
+                    end
+                end
+            end
         end)
     end
 

@@ -27,10 +27,17 @@ local cheat_client = {
             aim_key = Enum.KeyCode.LeftControl
         },
         esp = {
-            global = true,
+            global_enabled = true,
+            global_distance_limit = 2500,
+
             player = {
                 enabled = true,
                 max_distance = 1000,
+
+                box = true,
+                name = true, -- This will automatically tostring the distance
+                status = true,
+                health = true,
             },
             ore = {
                 enabled = true,
@@ -54,7 +61,7 @@ local cheat_client = {
             infinite_warmth = true,
             infinite_hunger = true,
 
-            force_respawn = true, -- Stance
+            force_revive = true, -- Stance
             no_down = false,
             spoof_snowshoes = true,
             hook_walkspeed = false,
@@ -104,6 +111,7 @@ local cheat_client = {
     status = {
         aiming = false,
         current_target = nil,
+        window_active = true,
     },
 
     hooks = {},
@@ -210,6 +218,10 @@ do
         function cheat_client:get_character(player)
             return Workspace.World.Characters:FindFirstChild(player)
         end
+
+        function cheat_client:can_render()
+            return cheat_client.config.esp.global_enabled and cheat_client.status.window_active
+        end
         
         function cheat_client:unload()
             
@@ -259,12 +271,213 @@ do
 
     do -- ESP
         function cheat_client:calculate_player_bounding_box(character)
-            
+            if character:FindFirstChild("HumanoidRootPart") then
+                local character_cframe = character.HumanoidRootPart.CFrame
+                local camera = cheat_client:get_camera()
+                local size = character.HumanoidRootPart.Size + Vector3.new(1,4,1)
+        
+                local left, lvis = camera:WorldToViewportPoint(character_cframe.Position + (camera.CFrame.RightVector * -size.Z))
+                local right, rvis = camera:WorldToViewportPoint(character_cframe.Position + (camera.CFrame.RightVector * size.z))
+                local top, tvis = camera:WorldToViewportPoint(character_cframe.Position + (camera.CFrame.UpVector * size.y) / 2)
+                local bottom, bvis = camera:WorldToViewportPoint(character_cframe.Position + (camera.CFrame.UpVector * -size.y) / 2)
+        
+                if not lvis and not rvis and not tvis and not bvis then 
+                    return 
+                end
+        
+                local width = math.floor(math.abs(left.x - right.x))
+                local height = math.floor(math.abs(top.y - bottom.y))
+        
+                local screen_position = camera:WorldToViewportPoint(character_cframe.Position)
+                local screen_size = Vector2.new(math.floor(width), math.floor(height))
+        
+                return Vector2.new(screen_position.X -(screen_size.X/ 2), screen_position.Y -(screen_size.Y / 2)), screen_size
+            end
         end
 
         function cheat_client:add_player_esp(player)
-            
-        end 
+            local esp = {
+                player = player,
+                drawings = {},
+                low_health = Color3.fromRGB(255,0,0),
+            }
+    
+            do -- Create Drawings
+                do -- Main
+                    esp.drawings.name = cheat_client:handle_drawing("Text", {
+                        Text = player.name,
+                        Font = 2,
+                        Size = 13,
+                        Center = true,
+                        Outline = true,
+                        Color = Color3.fromRGB(255,255,255)
+                    })
+        
+                    esp.drawings.box = cheat_client:handle_drawing("Square", {
+                        Thickness = 1,
+                        ZIndex = 2,
+                    })
+        
+                    esp.drawings.box_outline = cheat_client:handle_drawing("Square", {   
+                        Thickness = 3,
+                        ZIndex = 1,     
+                        Color = Color3.fromRGB(0,0,0),
+                    })
+        
+                    esp.drawings.health = cheat_client:handle_drawing("Line", {
+                        Thickness = 2,           
+                        ZIndex = 2,
+                        Color = Color3.fromRGB(0, 255, 0),
+                    })
+        
+                    esp.drawings.health_text = cheat_client:handle_drawing("Text", {
+                        Text = "100",
+                        Font = 2,
+                        Size = 13,
+                        Outline = true,
+                        Color = Color3.fromRGB(255, 255, 255),
+                    })
+        
+                    esp.drawings.health_outline = cheat_client:handle_drawing("Line", {
+                        Thickness = 5,           
+                        Color = Color3.fromRGB(0, 0, 0),
+                    })
+
+                    esp.drawings.status_effects = cheat_client:handle_drawing("Text", {
+                        Font = 2,
+                        Size = 13,
+                        Outline = true,
+                        Color = Color3.fromRGB(255, 255, 255),
+                    })
+    
+                end
+            end
+    
+            function esp:get_player_color(player)
+                if player:FindFirstChild("Status") then
+                   if player.Status.Faction.Value == 10991087 then
+                       return cheat_client.config.color_map.player.hbm
+                    end
+
+                    if player.Status.Role.Value == "Colonist" then
+                        return cheat_client.config.color_map.player.colonist
+                    end
+
+                    if player.Status.Role.Value == "Native" then
+                        return cheat_client.config.color_map.player.native
+                    end
+                else
+                    return Color3.fromRGB(255,255,255)
+                end
+            end
+
+            function esp:destruct()
+                esp.update_connection:diconnect() -- Disconnect before deleting drawings so that the drawings don't cause an index error
+                for _,v in next, esp.drawings do
+                    table.remove(framework.drawings, table.find(framework.drawings, v))
+                    v:Remove()
+                end
+            end
+    
+            esp.update_connection = cheat_client:handle_connection(RunService.RenderStepped, function()
+                if cheat_client:can_render() then
+                    if esp.player ~= nil then
+                        if esp.player.Character and esp.player.Character:FindFirstChild("HumanoidRootPart") and esp.player:FindFirstChild("Status") then
+                            local distance = (Workspace.CurrentCamera.CFrame.Position - esp.player.Character:FindFirstChild("HumanoidRootPart").CFrame.Position).Magnitude
+                            if distance < cheat_client.config.esp.global_distance_limit and distance < cheat_client.config.esp.player.max_distance then
+                                local screen_position, screen_size = cheat_client:calculate_player_bounding_box(player.Character)
+                                if screen_position and screen_size then
+                                    do -- Positioning
+                                        do -- Box
+                                            if cheat_client.config.esp.player.box then
+                                                esp.drawings.box.Position = screen_position
+                                                esp.drawings.box.Size = screen_size
+                                                esp.drawings.box.Color = esp:get_player_color(esp.player)
+                                                
+                                                esp.drawings.box_outline.Position = screen_position
+                                                esp.drawings.box_outline.Size = screen_size
+
+                                                esp.drawings.box.Visible = true
+                                                esp.drawings.box_outline.Visible = true
+                                            end
+ 
+                                        end
+
+                                        do -- Name (and distance)
+                                            if cheat_client.config.esp.player.name then
+                                                esp.drawings.name.Text = "["..tostring(math.floor(distance)).."m] "..esp.player.Name
+                                                esp.drawings.name.Position = esp.drawings.box.Position + Vector2.new(screen_size.X/2, -esp.drawings.name.TextBounds.Y)
+
+                                                esp.drawings.name.Visible = true
+                                            end
+                                        end
+    
+                                        do -- Health
+                                            if cheat_client.config.esp.player.health then
+                                                esp.drawings.health.From = Vector2.new((screen_position.X - 5), screen_position.Y + screen_size.Y)
+                                                esp.drawings.health.To = Vector2.new(esp.drawings.health.From.X, esp.drawings.health.From.Y - (esp.player.Status.Health.Value / esp.player.Status.Health.MaxValue) * screen_size.Y)
+                                                esp.drawings.health.Color = esp.low_health:Lerp(Color3.fromRGB(0,255,0), esp.player.Status.Health.Value / esp.player.Status.Health.MaxValue)
+        
+                                                esp.drawings.health_outline.From = esp.drawings.health.From + Vector2.new(0, 1)
+                                                esp.drawings.health_outline.To = Vector2.new(esp.drawings.health_outline.From.X, screen_position.Y - 1)
+                                
+                                                esp.drawings.health_text.Text = tostring(math.floor(esp.player.Status.Health.Value))
+                                                esp.drawings.health_text.Position = esp.drawings.health.To - Vector2.new((esp.drawings.health_text.TextBounds.X + 4), 0)
+
+                                                esp.drawings.health.Visible = true
+                                                esp.drawings.health_outline.Visible = true
+                                                esp.drawings.health_text.Visible = true
+                                            end
+                                        end
+
+                                        do -- Status
+                                            if cheat_client.config.esp.player.status then
+                                                local status_string = ""
+
+                                                if esp.player.Status.Bleed.Value > 0 then
+                                                    status_string ..= "[bleed]\n"
+                                                end
+    
+                                                if esp.player.Status.Downed.Value  then
+                                                    status_string ..= "[down]\n"
+                                                end
+    
+                                                esp.drawings.status_effects.Text = status_string
+                                                esp.drawings.status_effects.Position = (screen_position) + Vector2.new(screen_size.X + 2, 0)
+
+                                                esp.drawings.status_effects.Visible = true
+                                            end
+
+                                        end
+                                    end
+                                    
+                                else
+                                    for _,v in next, esp.drawings do
+                                        v.Visible = false
+                                    end
+                                end
+                            else
+                                for _,v in next, esp.drawings do
+                                    v.Visible = false
+                                end
+                            end
+                        else
+                            for _,v in next, esp.drawings do
+                                v.Visible = false
+                            end
+                        end
+                    else
+                        esp:destruct()
+                    end
+                else
+                    for _,v in next, esp.drawings do
+                        v.Visible = false
+                    end
+                end
+            end)
+    
+            return esp
+        end
 
         function cheat_client:add_ore_esp(ore)
             local esp = {
@@ -298,14 +511,14 @@ do
                     return
                 end
 
-                if (cheat_client.config.esp.global and cheat_client.config.esp.ore.enabled) then
+                if (cheat_client.config.esp.global_enabled and cheat_client.config.esp.ore.enabled) and (cheat_client:can_render()) then
                     local world_position = esp.object:GetBoundingBox()
                     local camera = cheat_client:get_camera()
                     local distance = (world_position.Position - camera.CFrame.Position).magnitude
                     if distance <= cheat_client.config.esp.ore.max_distance then
                         local screen_position, visible = camera:WorldToViewportPoint(world_position.Position)
                         if visible then
-                            esp.drawings.text.Text = esp.ore_type.."\n".."["..tostring(math.floor(distance)).."]"
+                            esp.drawings.text.Text = esp.ore_type.."\n".."["..tostring(math.floor(distance)).."m]"
                             esp.drawings.text.Position = Vector2.new(screen_position.X, screen_position.Y)
                             esp.drawings.text.Visible = true
                         else
@@ -355,14 +568,14 @@ do
                     return
                 end
                 
-                if (cheat_client.config.esp.global and cheat_client.config.esp.animal.enabled) then
+                if (cheat_client.config.esp.global_enabled and cheat_client.config.esp.animal.enabled) and (cheat_client:can_render()) then
                     local world_position = esp.object:GetBoundingBox()
                     local camera = cheat_client:get_camera()
                     local distance = (world_position.Position - camera.CFrame.Position).magnitude
                     if distance <= cheat_client.config.esp.animal.max_distance then
                         local screen_position, visible = camera:WorldToViewportPoint(world_position.Position)
                         if visible then
-                            esp.drawings.text.Text = esp.animal_type.."\n".."["..tostring(math.floor(distance)).."]\n"..(esp.animal_status.Available.Value and "[down]" or "")
+                            esp.drawings.text.Text = esp.animal_type.."\n".."["..tostring(math.floor(distance)).."m]\n"..(esp.animal_status.Available.Value and "[down]" or "")
                             esp.drawings.text.Position = Vector2.new(screen_position.X, screen_position.Y)
                             esp.drawings.text.Visible = true
                         else
@@ -371,7 +584,6 @@ do
                     else
                         esp.drawings.text.Visible = false
                     end
-                    
                 else
                     esp.drawings.text.Visible = false
                 end
@@ -411,14 +623,14 @@ do
                     return
                 end
 
-                if (cheat_client.config.esp.global and cheat_client.config.esp.dropped.enabled) then
+                if (cheat_client.config.esp.global_enabled and cheat_client.config.esp.dropped.enabled) and (cheat_client:can_render()) then
                     local world_position = esp.object:GetBoundingBox()
                     local camera = cheat_client:get_camera()
                     local distance = (world_position.Position - camera.CFrame.Position).magnitude
                     if distance <= cheat_client.config.esp.dropped.max_distance then
                         local screen_position, visible = camera:WorldToViewportPoint(world_position.Position)
                         if visible then
-                            esp.drawings.text.Text = esp.drop_type.."\n".."["..tostring(math.floor(distance)).."]\n"..(esp.drop_type == "pounds" and ("[£"..tostring(esp.object.Amount.Value).."]") or "")
+                            esp.drawings.text.Text = esp.drop_type.."\n".."["..tostring(math.floor(distance)).."m]\n"..(esp.drop_type == "pounds" and ("[£"..tostring(esp.object.Amount.Value).."]") or "")
                             esp.drawings.text.Position = Vector2.new(screen_position.X, screen_position.Y)
                             esp.drawings.text.Visible = true
                         else
@@ -427,7 +639,6 @@ do
                     else
                         esp.drawings.text.Visible = false
                     end
-                    
                 else
                     esp.drawings.text.Visible = false
                 end
@@ -472,9 +683,9 @@ do
     end
 
     do --Exploits
-        function cheat_client:force_respawn()
-            if game_client.stance and cheat_client.config.exploits.force_respawn then
-                game_client.stance:respawn()
+        function cheat_client:force_revive()
+            if cheat_client.config.exploits.force_revive then
+                game_client.stance:revive()
             end
         end
 
@@ -675,6 +886,12 @@ do
     end
 
     do -- ESP Initializer
+        for _,v in next, Players:GetPlayers() do
+            if v ~= local_player then 
+                cheat_client:add_player_esp(v)
+            end
+        end
+
         for _,v in next, Workspace.World.Operables.Resources:GetChildren() do
             if string.find(v.Name, "Mine") then
                 cheat_client:add_ore_esp(v)
@@ -718,16 +935,18 @@ do
         end)
     end 
     
-    cheat_client:handle_connection(UserInputService.InputBegan, function(input, processed)
-        -- Force Respawn lol
-        if input.KeyCode == Enum.KeyCode.F8 then
-            cheat_client:force_respawn()
-        elseif input.KeyCode == Enum.KeyCode.Home then
-            cheat_client.esp.global = not cheat_client.esp.global
-        elseif input.KeyCode == Enum.KeyCode.End then
-            cheat_client:force_rejoin()
-        end
-    end)
+    do -- Input
+        cheat_client:handle_connection(UserInputService.InputBegan, function(input, processed)
+            -- Force Respawn lol
+            if input.KeyCode == Enum.KeyCode.F8 then
+                cheat_client:force_revive()
+            elseif input.KeyCode == Enum.KeyCode.Home then
+                cheat_client.esp.global_enabled = not cheat_client.esp.global_enabled
+            elseif input.KeyCode == Enum.KeyCode.End then
+                cheat_client:force_rejoin()
+            end
+        end)
+    end
 
     do -- ESP Connections
         cheat_client:handle_connection(Players.PlayerAdded, function(player)
@@ -736,6 +955,8 @@ do
                     cheat_client:detect_mod(player)
                 end)
             end
+
+            cheat_client:add_player_esp(player)
         end)
 
         cheat_client:handle_connection(Workspace.World.Operables.Animals.ChildAdded, function(child)
@@ -750,6 +971,14 @@ do
 
         cheat_client:handle_connection(Workspace.World.Items.ChildAdded, function(child)
             cheat_client:add_dropped_esp(child)
+        end)
+
+        cheat_client:handle_connection(UserInputService.WindowFocused, function() 
+            cheat_client.status.window_active = true
+        end)
+    
+        cheat_client:handle_connection(UserInputService.WindowFocusReleased, function() 
+            cheat_client.status.window_active = false
         end)
     end
 
@@ -771,5 +1000,4 @@ do
             end
         end)
     end
-
 end

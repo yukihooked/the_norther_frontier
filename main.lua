@@ -65,8 +65,8 @@ local cheat_client = {
             spoof_maxeight = true, -- Inventory
             max_weight = 1000,
             bypass_inventory_check = true,
-            auto_pickup = true,
-            auto_pickup_distance = 8, -- It's distance limited on server
+            auto_pickup = false,
+            auto_pickup_distance = 6, -- It's distance limited on server
             auto_picked_list = {}, -- Prevent spam
 
             force_rejoin = true, -- Teleport
@@ -102,8 +102,8 @@ local cheat_client = {
     },
 
     status = {
+        aiming = false,
         current_target = nil,
-        block_save_progress = false,
     },
 
     hooks = {},
@@ -639,6 +639,12 @@ do
         game_client.interface:newHint(("Welcome %s, to Yukihook."):format(local_player.Name))
     end
 
+    do -- Hook Initializer
+        if cheat_client.config.exploits.spoof_maxeight then
+            game_client.inventory.maxWeight = cheat_client.config.exploits.max_weight
+        end
+    end
+
     do -- Mod Notifier
         if cheat_client.config.misc.mod_notification then
             for _,v in next, Players:GetPlayers() do
@@ -751,14 +757,9 @@ do
         cheat_client:handle_connection(RunService.RenderStepped, function()
             if cheat_client.config.exploits.auto_pickup then
                 for _,v in next, Workspace.World.Items:GetChildren() do
-                    if cheat_client.config.exploits.auto_picked_list[v] then
-                        continue
-                    end
                     if local_player.Character then
                         if local_player:DistanceFromCharacter(v:GetBoundingBox().Position) <= cheat_client.config.exploits.auto_pickup_distance then
                             local object_targetting = game_client.interaction:get(v)
-
-                            cheat_client.config.exploits.auto_picked_list[v] = true
                             game_client.interaction.interactionType = "takeItem"
                             game_client.interaction.objectTargetting = object_targetting
                             game_client.interaction.parameter = nil

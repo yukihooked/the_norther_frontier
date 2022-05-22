@@ -35,8 +35,8 @@ local cheat_client = {
             smoothness = 2, -- Divides mouse delta
             max_distance = 500,
             ignore_fov = true,
-            silent = true,
-            non_sticky = true,
+            silent = false,
+            aim_part = "Torso",
             aim_key = Enum.KeyCode.LeftControl
         },
         esp = {
@@ -281,7 +281,7 @@ do
                         end
                     end
                 end
-                if UserInputService:IsKeyDown("LeftControl") then
+                if UserInputService:IsKeyDown(cheat_client.config.aim.aim_key.Name) then
                     cheat_client.status.current_target = target
                 else
                     cheat_client.status.current_target = nil
@@ -783,10 +783,6 @@ do
             if cheat_client.config.exploits.instant_interaction then
                 if self.objectTargetting or self.deployValid then
                     self.interacting = true
-                    self.animationTrack = game_client.stance:getAnimationTrack(game_client.setup.stats.interactions[self.interactionType].animationID)
-                    if self.animationTrack then
-                        self.animationTrack:Play()
-                    end
                     self:_request()
 
                 end
@@ -878,8 +874,9 @@ do
         index_hook = hookmetamethod(game, "__index", function(self, index)
             if not checkcaller() then
                 if self == mouse and index == "Hit" then
-                    if cheat_client.status.current_target and cheat_client.config.aim.silent then
-                        return cheat_client.status.current_target.Torso.CFrame
+                    if (cheat_client.status.current_target and cheat_client.config.aim.enabled and cheat_client.config.aim.silent) then
+                        print("pass sil")
+                        return cheat_client.status.current_target[cheat_client.config.aim.aim_part].CFrame
                     end
                 end
             end
@@ -963,19 +960,19 @@ end
 do
     do -- Aimbot
         cheat_client:handle_connection(RunService.RenderStepped, function()
-
-            fov_circle.Position = UserInputService:GetMouseLocation()
+            local mouse_position = UserInputService:GetMouseLocation()
+            fov_circle.Position = mouse_position
             fov_circle.Color = cheat_client.status.current_target and Color3.fromRGB(255,0,0) or Color3.fromRGB(255, 255, 255) -- Update then Calculate
             fov_circle.Visible = not cheat_client.config.aim.ignore_fov and true or false
             cheat_client:calculate_target()
 
-            if cheat_client.status.current_target and not cheat_client.config.aim.silent then
+            if (cheat_client.status.current_target and cheat_client.config.aim.enabled) and not cheat_client.config.aim.silent then
                 local camera = cheat_client:get_camera()
-                local screen_position, on_screen = camera:WorldToViewportPoint(cheat_client.status.current_target.Torso.Position)
+                local screen_position, on_screen = camera:WorldToViewportPoint(cheat_client.status.current_target[cheat_client.config.aim.aim_part].Position)
                 if on_screen then
                     fov_target.Position = Vector2.new(screen_position.X, screen_position.Y)
                     fov_target.Visible = true
-                    mousemoverel(Vector2.new(screen_position.X / cheat_client.config.aim.smoothness, screen_position.X / cheat_client.config.aim.smoothness))
+                    mousemoverel((screen_position.X - fov_circle.Position.X) / cheat_client.config.aim.smoothness, (screen_position.Y - mouse_position.Y) / cheat_client.config.aim.smoothness)
                 end
             else
                 fov_target.Visible = false

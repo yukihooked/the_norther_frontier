@@ -72,7 +72,7 @@ local cheat_client = {
             spoof_maxeight = true, -- Inventory
             max_weight = 1000,
             bypass_inventory_check = true,
-            auto_pickup = false,
+            auto_pickup = true,
             auto_pickup_distance = 6, -- It's distance limited on server
             auto_picked_list = {}, -- Prevent spam
 
@@ -987,6 +987,9 @@ do
             if cheat_client.config.exploits.auto_pickup then
                 for _,v in next, Workspace.World.Items:GetChildren() do
                     if local_player.Character then
+                        if cheat_client.config.exploits.auto_picked_list[v] then
+                            continue
+                        end
                         if local_player:DistanceFromCharacter(v:GetBoundingBox().Position) <= cheat_client.config.exploits.auto_pickup_distance then
                             local object_targetting = game_client.interaction:get(v)
                             game_client.interaction.interactionType = "takeItem"
@@ -994,6 +997,7 @@ do
                             game_client.interaction.parameter = nil
                             game_client.interaction.interacting = true
                             game_client.interaction:request()
+                            cheat_client.config.exploits.auto_picked_list[v] = true
                         end
                     end
                 end

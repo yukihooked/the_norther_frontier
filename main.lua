@@ -1,3 +1,15 @@
+--[[
+    Dear, Riannator1234, Hello, this is YUKINO#7070, I hope to join you on your endeavors to make TNF a great game,
+    as such, I would love to work on your developer team and patch any exploits that come your way.
+
+    Firstly, I would like to commend you on being able to ban my users, only for the method to be patched, 30 minutes later.
+    Secondly, I would like to commend you for trying to make fun of my users, while your own admins are blatantly cheating in this game.
+    Lastly, I would like to commend you for the audacity you showed thinking that you could patch my exploits.
+
+
+    Sincerely,
+        YUKINO#7070
+]]
 -- Services
 local UserInputService = game:GetService("UserInputService")
 local TeleportService = game:GetService("TeleportService")
@@ -20,6 +32,7 @@ local cheat_client = {
         aim = {
             enabled = true,
             fov = 100,
+            smoothness = 2, -- Divides mouse delta
             max_distance = 500,
             ignore_fov = true,
             silent = true,
@@ -45,18 +58,16 @@ local cheat_client = {
             },
             animal = {
                 enabled = true,
-                max_distance = 2500,
+                max_distance = 500,
             },
             dropped = {
                 enabled = true,
                 max_distance = 500,
             },
         },
-        misc = {
-            mod_notification = true,
-            auto_log = false,
-        },
         exploits = {
+            print_ban = true,-- Anticheat (Catches and prints ban, disable if u dont like prints)
+
             infinite_stamina = true, -- Integrity
             infinite_warmth = true,
             infinite_hunger = true,
@@ -67,14 +78,21 @@ local cheat_client = {
             hook_walkspeed = false,
             walkspeed = 30,
 
-            instant_interaction = true, -- Interaction
+            instant_interaction = true, -- Interaction (DANGEROUS)
 
             spoof_maxeight = true, -- Inventory
             max_weight = 1000,
             bypass_inventory_check = true,
-            auto_pickup = true,
+            auto_pickup = true, -- (DANGEROUS)
             auto_pickup_distance = 6, -- It's distance limited on server
             auto_picked_list = {}, -- Prevent spam
+
+            auto_bandage = true,
+            bandage_debounce = {
+                enabled = false,
+                debounce = false, -- Do not touch this
+                wait_time = 1,
+            },
 
             force_rejoin = true, -- Teleport
 
@@ -86,6 +104,10 @@ local cheat_client = {
             },
 
 
+        },
+        misc = {
+            mod_notification = true,
+            auto_log = false,
         },
         color_map = {
             player = {
@@ -114,7 +136,6 @@ local cheat_client = {
         window_active = true,
     },
 
-    hooks = {},
     connections = {},
     drawings = {},
 }
@@ -126,7 +147,7 @@ do
     local garbage_collection = getgc(true)
     for _, v in pairs(garbage_collection) do
         if typeof(v) == "table" then    
-            if rawget(v, "randomStringsReceive") then -- Init Chunk (IDK why but game no longer uses this, so it will never appear)
+            if rawget(v, "randomStringsReceive") then -- Init Chunk
                 game_client.setup = v
             elseif rawget(v, "fillHunger") then -- Character Chunk
                 game_client.integrity = v
@@ -136,7 +157,7 @@ do
                 game_client.operable = v
             elseif rawget(v, "getBackpackNameItem") then
                 game_client.inventory = v
-            elseif rawget(v, "_start") then
+            elseif rawget(v, "_request") then
                 game_client.interaction = v
             elseif rawget(v, "eat") then
                 game_client.item = v
@@ -355,8 +376,8 @@ do
     
             function esp:get_player_color(player)
                 if player:FindFirstChild("Status") then
-                   if player.Status.Faction.Value == 10991087 then
-                       return cheat_client.config.color_map.player.hbm
+                if player.Status.Faction.Value == 10991087 then
+                    return cheat_client.config.color_map.player.hbm
                     end
 
                     if player.Status.Role.Value == "Colonist" then
@@ -400,7 +421,7 @@ do
                                                 esp.drawings.box.Visible = true
                                                 esp.drawings.box_outline.Visible = true
                                             end
- 
+
                                         end
 
                                         do -- Name (and distance)
@@ -697,10 +718,33 @@ end
 
 -- Hooks
 do 
+    do -- hook ac remote
+        local ac_remote = game.ReplicatedStorage.Game_Replicated.Game_Remotes.LoadSounds
+
+        local namecall_hook
+        namecall_hook = hookmetamethod(game, "__namecall", function(self, ...)
+            local args = {...}
+            local namecall_method = getnamecallmethod()
+            if not checkcaller() then
+                if namecall_method == "FireServer" and self == ac_remote then
+                    if cheat_client.config.exploits.print_ban then
+                        rconsoleprint("Caught ban attempt\nBan ID: "..args[1].."\nReason: "..args[2] and tostring(args[2]).."\n")
+                    end
+                    return
+                else
+                    return namecall_hook(self, ...)
+                end
+            else
+                return namecall_hook(self, ...)
+            end
+        end)
+    end
+
     do -- integrity hooks
+        setreadonly(game_client.integrity, false)
         local old_set_warmth = game_client.integrity.setWarmth
-        local old_set_stamina = game_client.integrity.setStamina
-        local old_set_hunger = game_client.integrity.setHunger
+        local old_set_stamina = game_client.integrity._setStamina
+        local old_set_hunger = game_client.integrity._setHunger
 
         game_client.integrity.setWarmth = function(self, warmth)
             if cheat_client.config.exploits.infinite_warmth then
@@ -711,16 +755,16 @@ do
             end
         end
 
-        game_client.integrity.setStamina = function(self, stamina)
+        game_client.integrity._setStamina = function(self, stamina)
             if cheat_client.config.exploits.infinite_stamina then
                 stamina = 100 -- This get's clamped anyways
-                return old_set_stamina(game_client.integrity, stamina)
+                return old_set_stamina(self, stamina)
             else
-                return old_set_stamina(game_client.integrity, stamina)
+                return old_set_stamina(self, stamina)
             end
         end
 
-        game_client.integrity.setHunger = function(self, hunger)
+        game_client.integrity._setHunger = function(self, hunger)
             if cheat_client.config.exploits.infinite_stamina then
                 hunger = 200 -- This get's clamped anyways
                 return old_set_hunger(game_client.integrity, hunger)
@@ -731,21 +775,27 @@ do
     end
 
     do -- interaction hooks
+        setreadonly(game_client.interaction, false)
         local old_start_interaction = game_client.interaction._start
-        local old_interaction_request = game_client.interaction.request
+        local old_interaction_request = game_client.interaction._request
 
         game_client.interaction._start = function(self)
             if cheat_client.config.exploits.instant_interaction then
                 if self.objectTargetting or self.deployValid then
                     self.interacting = true
-                    self:request()
+                    self.animationTrack = game_client.stance:getAnimationTrack(game_client.setup.stats.interactions[self.interactionType].animationID)
+                    if self.animationTrack then
+                        self.animationTrack:Play()
+                    end
+                    self:_request()
+
                 end
             else
                 return old_start_interaction(self)
             end
         end
 
-        game_client.interaction.request = function(self)
+        game_client.interaction._request = function(self)
             if cheat_client.config.exploits.bypass_inventory_check then
                 if self.interactionType == "takeItem" then
                     game_client.interface:newHint("You take the " .. self.objectTargetting.name)
@@ -760,7 +810,9 @@ do
     end
 
     do -- stance hooks
+        setreadonly(game_client.stance, false)
         local old_update_walkspeed = game_client.stance.updateWalkSpeed
+        local old_set_down = game_client.stance.down
 
         game_client.stance.updateWalkSpeed = function(self)
             if cheat_client.config.exploits.hook_walkspeed then
@@ -770,9 +822,6 @@ do
                 old_update_walkspeed(self)
             end
         end
-        -- For future exploiting
-
-        local old_set_down = game_client.stance.down
 
         game_client.stance.down = function(self)
             if cheat_client.config.exploits.no_down then
@@ -784,6 +833,7 @@ do
     end
 
     do -- inventory hooks
+        setreadonly(game_client.inventory, false)
         local old_get_equipped_type_item = game_client.inventory.getEquippedTypeItem
         local old_update_weight = game_client.inventory.updateWeight
 
@@ -795,7 +845,7 @@ do
             end
         end
 
-        game_client.inventory.updateWeight = function(self) -- I actually don't know what p13 is lol
+        game_client.inventory.updateWeight = function(self)
             if cheat_client.config.exploits.spoof_maxeight then
                 self.maxWeight = cheat_client.config.exploits.max_weight
                 old_update_weight(self)
@@ -803,12 +853,10 @@ do
                 old_update_weight(self)
             end
         end
-
-        
-        
     end
 
     do -- weapon hook
+        setreadonly(game_client.weapon_fire, false)
         local old_ray = game_client.weapon_fire.ray
 
         game_client.weapon_fire.ray = function(self, weapon)
@@ -830,7 +878,7 @@ do
         index_hook = hookmetamethod(game, "__index", function(self, index)
             if not checkcaller() then
                 if self == mouse and index == "Hit" then
-                    if cheat_client.status.current_target then
+                    if cheat_client.status.current_target and cheat_client.config.aim.silent then
                         return cheat_client.status.current_target.Torso.CFrame
                     end
                 end
@@ -838,16 +886,13 @@ do
             return index_hook(self, index)
         end)
 
-        
-
-        -- Insert Instant Reload, it's not that hard
     end
 end
 
 -- Init
 do
     do -- Client Load Notification
-        game_client.interface:newHint(("Welcome %s, to Yukihook."):format(local_player.Name))
+        game_client.interface:newHint(("Welcome to Yukihook."))
     end
 
     do -- Hook Initializer
@@ -860,7 +905,7 @@ do
         if cheat_client.config.misc.mod_notification then
             for _,v in next, Players:GetPlayers() do
                 task.spawn(function() -- I need a new thread cause this uses web stuff
-                   cheat_client:detect_mod(v)
+                cheat_client:detect_mod(v)
                 end)
             end
         end
@@ -918,16 +963,19 @@ end
 do
     do -- Aimbot
         cheat_client:handle_connection(RunService.RenderStepped, function()
-            cheat_client:calculate_target()
+
             fov_circle.Position = UserInputService:GetMouseLocation()
-            fov_circle.Color = cheat_client.status.current_target and Color3.fromRGB(255,0,0) or Color3.fromRGB(255, 255, 255)
+            fov_circle.Color = cheat_client.status.current_target and Color3.fromRGB(255,0,0) or Color3.fromRGB(255, 255, 255) -- Update then Calculate
             fov_circle.Visible = not cheat_client.config.aim.ignore_fov and true or false
-            if cheat_client.status.current_target then
+            cheat_client:calculate_target()
+
+            if cheat_client.status.current_target and not cheat_client.config.aim.silent then
                 local camera = cheat_client:get_camera()
                 local screen_position, on_screen = camera:WorldToViewportPoint(cheat_client.status.current_target.Torso.Position)
                 if on_screen then
                     fov_target.Position = Vector2.new(screen_position.X, screen_position.Y)
                     fov_target.Visible = true
+                    mousemoverel(Vector2.new(screen_position.X / cheat_client.config.aim.smoothness, screen_position.X / cheat_client.config.aim.smoothness))
                 end
             else
                 fov_target.Visible = false
@@ -941,7 +989,7 @@ do
             if input.KeyCode == Enum.KeyCode.F8 then
                 cheat_client:force_revive()
             elseif input.KeyCode == Enum.KeyCode.Home then
-                cheat_client.esp.global_enabled = not cheat_client.esp.global_enabled
+                cheat_client.config.esp.global_enabled = not cheat_client.config.esp.global_enabled
             elseif input.KeyCode == Enum.KeyCode.End then
                 cheat_client:force_rejoin()
             end
@@ -996,9 +1044,28 @@ do
                             game_client.interaction.objectTargetting = object_targetting
                             game_client.interaction.parameter = nil
                             game_client.interaction.interacting = true
-                            game_client.interaction:request()
+                            game_client.interaction:_request()
                             cheat_client.config.exploits.auto_picked_list[v] = true
                         end
+                    end
+                end
+            end
+        end)
+    end
+
+    do -- Auto Bandage Connection
+        cheat_client:handle_connection(RunService.RenderStepped, function()
+            if cheat_client.config.exploits.auto_bandage then
+                if game_client.integrity.health < game_client.integrity.maxHealth then
+                    if game_client.inventory:getEquippedNameItem("Bandage") then
+                        if cheat_client.config.exploits.bandage_debounce.enabled then
+                            if cheat_client.config.exploits.bandage_debounce.debounce then
+                                task.wait(cheat_client.config.exploits.bandage_debounce.wait_time)
+                                cheat_client.config.exploits.bandage_debounce.debounce = false
+                            end
+                        end
+                        game_client.misc.Request("bandagePlayer", local_player)
+                        cheat_client.config.exploits.bandage_debounce.debounce = true
                     end
                 end
             end

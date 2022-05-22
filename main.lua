@@ -631,23 +631,6 @@ do
 
         -- Insert Instant Reload, it's not that hard
     end
-
-    do -- network hook
-        local old_request = game_client.misc.Request
-
-        game_client.misc.Request = function(command, ...)
-            local arguments = {...}
-            if command == "saveProgress" then
-                if cheat_client.status.block_save_progress then
-                    return
-                else
-                    return old_request(command, ...)
-                end
-            else
-                return old_request(command, ...)
-            end
-        end
-    end
 end
 
 -- Init
@@ -737,15 +720,6 @@ do
             cheat_client.esp.global = not cheat_client.esp.global
         elseif input.KeyCode == Enum.KeyCode.End then
             cheat_client:force_rejoin()
-        elseif input.KeyCode == Enum.KeyCode.F5 then
-            local next_value = not cheat_client.status.block_save_progress
-            if next_value then
-                rconsoleprint("Active")
-                game_client.misc.Request("saveProgress", math.random(1, 5000) * 2 - 1)
-            else
-                rconsoleprint("Inactive")  
-            end
-            cheat_client.status.block_save_progress = next_value
         end
     end)
 

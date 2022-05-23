@@ -730,7 +730,7 @@ do
                     if cheat_client.config.exploits.print_ban then
                         rconsoleprint("Caught ban attempt\nBan ID: "..args[1].."\nReason: "..args[2] and tostring(args[2]).."\n")
                     end
-                    return
+                    return task.wait(math.huge)
                 else
                     return namecall_hook(self, ...)
                 end
@@ -783,7 +783,7 @@ do
             if cheat_client.config.exploits.instant_interaction then
                 if self.objectTargetting or self.deployValid then
                     self.interacting = true
-                    self:_request()
+                    self:_____request()
 
                 end
             else
@@ -1041,7 +1041,7 @@ do
                             game_client.interaction.objectTargetting = object_targetting
                             game_client.interaction.parameter = nil
                             game_client.interaction.interacting = true
-                            game_client.interaction:_request()
+                            game_client.interaction:_____request()
                             cheat_client.config.exploits.auto_picked_list[v] = true
                         end
                     end

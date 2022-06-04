@@ -1,3 +1,5 @@
+-- THIS IS DEPERECATED ILL UPDATE WHEN I GET AROUND TO IT
+
 -- Game Client
 local game_client = {}
 
